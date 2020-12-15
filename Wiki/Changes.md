@@ -1,8 +1,8 @@
 # MEF for Windows 8 Windows Store apps
 
-In .NET 4.5 Beta, Windows 8 Windows Store apps could use a subset of MEF functionality from the full .NET Framework. To better align with the goals and scenarios of Windows Store apps, in .NET 4.5 RC MEF for Windows Store apps is consumed by installing the _Microsoft.Composition_ package.
+In .NET 4.5 Beta, Windows 8 Windows Store apps could use a subset of MEF functionality from the full .NET Framework. To better align with the goals and scenarios of Windows Store apps, in .NET 4.5 RC MEF for Windows Store apps is consumed by installing the` _Microsoft.Composition_ `package.
 
-The MEF implementation in _Microsoft.Composition_ is not code-compatible with the MEF functionality in .NET 4.5 Beta.
+The MEF implementation in `_Microsoft.Composition_` is not code-compatible with the MEF functionality in .NET 4.5 Beta.
 
 For most applications, a few simple steps will be required to move to the new MEF version. These are outlined step-by-step below. A full list of changes follows.
 
@@ -12,30 +12,24 @@ For most applications, a few simple steps will be required to move to the new ME
 
 The new assemblies are referenced using the Visual Studio Package Manager dialog.
 
-# Right-click on your Windows Store application project
-# Select “Manage NuGet Packages”
-# Select “Include Prerelease Packages”
-# Search for Microsoft.Composition
-# Click “Install”
+- Right-click on your Windows Store application project
+
+- Select **Manage NuGet Packages**
+- Select **Include Prerelease Packages**
+- Search for **Microsoft.Composition**
+- Click **Install**
 
 Alternatively, the Package Manager Console can be used:
 
-{{
-Install-Package Microsoft.Composition –Pre}}
-
-Delivering MEF as a NuGet package enables a more responsive development process.
+> Install-Package Microsoft.Composition –Pre
 
 ## Namespace change
 
-Use Visuals Studio’s Find and Replace in Files dialog to replace the text:
+Use Visuals Studio's Find and Replace in Files dialog to replace the text:
 
-{{System.ComponentModel.Composition}}
+`System.ComponentModel.Composition` with: `System.Composition`
 
-with:
-
-{{System.Composition}}
-
-_**Rationale:** MEF for Windows Store apps is optimized for this model and therefore makes changes to some fundamental MEF types like {{[Import](Import)}} and {{[Export](Export)}}. Changing the namespace ensures that types can be uniquely identified and correct information can be found more easily._
+**Rationale:** MEF for Windows Store apps is optimized for this model and therefore makes changes to some fundamental MEF types like `Import` and `Export`. Changing the namespace ensures that types can be uniquely identified and correct information can be found more easily.
 
 # Part-level changes
 
@@ -43,84 +37,78 @@ _**Rationale:** MEF for Windows Store apps is optimized for this model and there
 
 Imported and exported members must be publicly visible in order for them to be composed. For example:
 
-{code:c#}
-    [Import](Import)
-    private ILogger Logger { get; set; }
-{code:c#}
+```c#
+[Import]
+private ILogger Logger { get; set; }
+```
 
 Must be updated to:
 
-{code:c#}
-    [Import](Import)
-    public ILogger Logger { get; set; }
-{code:c#}
+```c#
+[Import]
+public ILogger Logger { get; set; }
+```
 
 The same is true of importing constructors and property exports.
 
-_**Rationale:** Requiring that imports and exports are public ensures that parts behave consistently on all platforms, and that code generation techniques can be used to improve throughput._
+**Rationale:** Requiring that imports and exports are public ensures that parts behave consistently on all platforms, and that code generation techniques can be used to improve throughput.
 
 ### Unsupported features
 
 Field exports and imports are not supported – use property imports and exports instead.
 
-_**Rationale:** Due to the requirement for public imports and exports, fields are less useful for this purpose. Ignoring them improves startup time for the composition engine._
-
 ## Part creation policy
 
-{{[PartCreationPolicy(CreationPolicy.NonShared)](PartCreationPolicy(CreationPolicy.NonShared))}} is no longer required, as parts are non-shared by default.
-
-Parts that need to be shared are marked with the {{[Shared](Shared)}} attribute.
-
-_**Rationale:** The default creation policy was previously {{CreationPolicy.Any}}, making it confusing to determine the scope in which a part could be used. Sharing and lifetime have been streamlined so that the sharing scope of a part is always explicitly visible – a part marked {{[Shared](Shared)}} will always be globally shared; a part marked {{[Shared("vm")](Shared(_vm_))}} will always be shared within the named boundary “vm”, parts without an annotation are always non-shared. See also: {{[SharingBoundary](SharingBoundary)}} and {{ExportFactory<T>}}._
+`[PartCreationPolicy(CreationPolicy.NonShared)]`is no longer required, as parts are non-shared by **default**. Parts that need to be shared are marked with the `[Shared]` attribute.
 
 ## IPartImportsSatisfiedNotification
 
-This interface has been replaced with the [OnImportsSatisfied](OnImportsSatisfied) attribute.
+This interface has been replaced with the `[OnImportsSatisfied]` attribute. For example, the following part:
 
-For example, the following part:
-
-{code:c#}
-    [Export](Export)
-    public class APart : IPartImportsSatisfiedNotification
-    {
-        public void OnImportsSatisfied() { }
-    }
-{code:c#}
+```c#
+[Export](Export)
+public class APart : IPartImportsSatisfiedNotification
+{
+    public void OnImportsSatisfied() { }
+}
+```
 
 Can be rewritten as:
 
-{code:c#}
-    [Export](Export)
-    public class APart 
-    {
-        [OnImportsSatisfied](OnImportsSatisfied)
-        public void OnImportsSatisfied() { }
+```c#
+[Export]
+public class APart 
+{
+    [OnImportsSatisfied](OnImportsSatisfied)
+    public void OnImportsSatisfied()
+    { 
     }
-{code:c#}
+}
+```
 
-_**Rationale:** MEF’s convention support is based on attributes. By marking the OnImportsSatisfied() method with an attribute, conventions can select this method. This was not possible with the interface-based approach._
+**Rationale:** MEF's convention support is based on attributes. By marking the OnImportsSatisfied() method with an attribute, conventions can select this method. This was not possible with the interface-based approach.
 
 ## Format of Metadata Views
 
 Metadata views must be concrete types rather than interfaces. For example, the metadata view:
 
-{code:c#}
-    public interface INamed
-    {
-        string Name { get; set; }
-    }
-{code:c#}
+```c#
+public interface INamed
+{
+    string Name { get; set; }
+}
+```
 
 Can be rewritten as:
 
-{code:c#}
-    public class Named
-    {
-        public string Name { get; set; }
-    }
-{code:c#}
+```c#
+public class Named
+{
+    public string Name { get; set; }
+}
+```
 
-_**Rationale:** This requirement arises from the absence of the System.Reflection.Emit namespace in .NET for Windows Store apps. Without the functionality in this namespace, metadata views based on interfaces cannot be generated._
+**Rationale:** This requirement arises from the absence of the `System.Reflection.Emit` namespace in .NET for Windows Store apps. Without the functionality in this namespace, metadata views based on interfaces cannot be generated.
 
 # Hosting changes
 

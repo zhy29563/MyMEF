@@ -12,14 +12,16 @@ The first approach is to pass an existing instance to MEF and ask it to compose 
 
 ```c#
 [Import]
-public Window MainWindow { get; set; }
+public Window MainWindow { get; set; } // 在组合时导入
 
 void App_Startup(object sender, StartupEventArgs e)
 {
     var catalog = new AssemblyCatalog(typeof(App).Assembly);
     var container = new CompositionContainer(catalog);
     container.ComposeParts(this);
-    base.MainWindow = Window;
+    
+    // 用组合导入的实例进行赋值
+    base.MainWindow = MainWindow;
     MainWindow.Show();
 }
 ```
@@ -33,22 +35,23 @@ void App_Startup(object sender, StartupEventArgs e)
 {
     var catalog = new AssemblyCatalog(typeof (App).Assembly);
     var container = new CompositionContainer(catalog);
+    
+    // 通过容器获取对象实例
     this.MainWindow = container.GetExportedValue<Window>();
     MainWindow.Show();
 }
 ```
 
-In the startup method above I am creating a catalog with the current assembly, adding it to a container and then querying for the MainWindow. During the querying, MEF discovers the MainWindow (assuming it was exported) 
+In the startup method above, I am creating a catalog with the current assembly, adding it to a container and then querying for the `MainWindow`. During the querying, MEF discovers the `MainWindow` (assuming it was exported) 
 
 # Creating a standardized class for starting composition
 
-In the previous examples, bootstrapping code is introduced into the startup of the application. This kind of approach works well for client / server applications that have a centralized initialization point. In the previous case the initialization code is very specific. With some refactoring I can create a standardized initialization mechanism such as CompositionStarter below which can be reused across different UI mediums including on the server.
+In the previous examples, bootstrapping code is introduced into the startup of the application. This kind of approach works well for C/S applications that have a `centralized initialization point`. In the previous case the initialization code is very specific. With some refactoring I can create a standardized initialization mechanism such as `CompositionStarter` below which can be reused across different UI mediums including on the server.
 
-```
+```c#
 public class CompositionStarter<TParams>
 {
     private CompositionContainer _container;
-
     public CompositionStarter(params ComposablePartCatalog[] catalogs)
     {
         var aggregate = new AggregateCatalog(catalogs);
@@ -65,7 +68,8 @@ public class CompositionStarter<TParams>
 
     public CompositionStarter()
     {
-        _container = new CompositionContainer(new AssemblyCatalog(Assembly.GetCallingAssembly()));
+        _container = new CompositionContainer(
+            new AssemblyCatalog(Assembly.GetCallingAssembly()));
     }
 
     public void Start(TParams parameters)
@@ -102,9 +106,9 @@ public interface IStartable<TParams>
 }
 ```
 
-CompositionStarter<TParam> creates a container (or uses the one that you pass in). On the Start method it pulls all IStartable<TParam> exports from the container and invokes their Start methods passing in the parameters. With CompositionStarter in place, I can now introduce a WpfStartable and move the code for importing and displaying the window there.
+`CompositionStarter<TParam>` creates a container (or uses the one that you pass in). On the Start method it pulls all `IStartable<TParam>` exports from the container and invokes their Start methods passing in the parameters. With `CompositionStarter` in place, I can now introduce a WpfStartable and move the code for importing and displaying the window there.
 
-```
+```c#
 public class WpfStartable : IStartable<object>
 {
     [Import]
@@ -118,15 +122,9 @@ public class WpfStartable : IStartable<object>
 }
 ```
 
- 
-
- 
-
- 
-
 The app class can then be updated to use the following starter code:
 
-```
+```c#
 void App_Startup(object sender, StartupEventArgs e)
 {
     var starter = new CompositionStarter<object>();
@@ -136,9 +134,7 @@ void App_Startup(object sender, StartupEventArgs e)
 
 The code is no longer app-specific, nor is it specific to a particular UI platform. The same code pattern also works for a Silverlight application, a WinForms application or a console app.
 
-Notice that CompositionStarter pulls multiple IStartable implementations. This allows me to introduce other pluggable startup operations. 
-
-### 
+Notice that `CompositionStarter` pulls multiple `IStartable` implementations. This allows me to introduce other pluggable startup operations. 
 
 ### A note about Silverlight and PartInitializer
 
@@ -148,8 +144,7 @@ You may want to combine the two approaches. The benefits of doing this are you c
 
 PartInitializer allows you to override its default container through the CompositionHost.InitializeContainer method. This means you can create a container that is shared by both PartInitializer and the CompositionStarter class.
 
-```
-
+```c#
 void App_Startup(object sender, StartupEventArgs e)
 {
     var catalog = new AggregateCatalog(new AssemblyCatalog(Assembly.GetCallingAssembly()));
@@ -158,14 +153,13 @@ void App_Startup(object sender, StartupEventArgs e)
     var starter = new CompositionStarter<object>();
     starter.Start();
 }
-
 ```
 
 # Using MEF within XAML in WPF
 
 In the previous section I spoke about the PartInitializer API which we baked into Silverlight for composition in XAML, it lets you write code such as the following:
 
-```
+```c#
 public partial class Dashboard : UserControl
 {
     public MainPage()
@@ -179,7 +173,6 @@ public partial class Dashboard : UserControl
     [ImportMany]
     public UserControl[] Widgets { get; set; }
 }
-
 ```
 
 Above Dashboard is a user control that is created within XAML. It imports a collection of widgets. It forces itself to be composed by calling PartInitializer.SatisfyImports(). 
@@ -190,9 +183,9 @@ Alternatively you can have the control which hosts Dashboard compose it by calli
 
 # Hosting MEF within a library
 
-We’ve discussed an approach for hosting within an application, but what about a library? Should you use CompositionStarter then? I would err against that as it’s not ideal. For example take the case of a rules engine that uses MEF to discover rules. The rules engine itself needs the rules, so delegating off to IStartables to get the rules adds extra complexity with little gain. Having the rules engine host a container which it uses to get the rules is not at all a problem. Here is one way to implement it.
+We've discussed an approach for hosting within an application, but what about a library? Should you use `CompositionStarter` then? I would err against that as it's not ideal. For example take the case of a rules engine that uses MEF to discover rules. The rules engine itself needs the rules, so delegating off to `IStartables` to get the rules adds extra complexity with little gain. Having the rules engine host a container which it uses to get the rules is not at all a problem. Here is one way to implement it.
 
-```
+```c#
 public class RulesEngine
 {
     private readonly CompositionContainer _container;
@@ -236,7 +229,7 @@ I know there are going to be a bunch of folks reading this saying why should you
 
 An alternative to using CSL that supports any container is to have an app-specific IRulesEngineServiceAdapter export which returns all the dependencies / imports that the engine needs. The service adapter can use whichever IoC it chooses, and it can leverage the full capabilities of that container. The engine could still use MEF to discover the adapter and then use the adapter from there on. 
 
-```
+```c#
 public class RulesEngine
 {
     private readonly CompositionContainer _container;
@@ -266,7 +259,7 @@ public class RulesEngine
 
 In the MEF case, the adapter would simply be a part which imports the rules. For other containers the implementation would differ.
 
-```
+```c#
 [InheritedExport]
 public interface IRulesEngineServiceAdapter
 {
