@@ -1,11 +1,18 @@
-# Overview 
+# Overview
+
 The PictureViewer sample is a simple Silverlight client to browse through pictures downloaded from the web. Currently, it only downloads three sample albums but could easily be extended to allow more albums or more complex albums.
 
-# How does MEF fit in? 
-MEF is used to demonstrate 3 principles in this sample. First, several UI elements use [import](import) to notify the system they are interested in certain components, and MEF can satisfy those imports without having to resort to hard-coding. Second, several components can have multiple variations that could be replaced at runtime. You could have multiple authentication modules to allow the viewer to log into different systems, or you could replace the types of views that are enabled. Third, light-up scenarios are easily enabled. This is demonstrated by the albums package being loaded on-demand, only after the user logs in.
+# How does MEF fit in?
 
-# Important parts 
-First, during Application_Startup, the app prepares the main window, sets it as the root visual, and prepares it for compostion. The initial composition adds all of the assemblies in the current xap to the container using AddPackage(Package.Current). It also adds a second PackageCatalog, wraps it in a part, which is then added to the container. This part is imported by the PhotoAlbumsProvider to add packages after the login without having to connect back to the container. After the Loaded event is fired on the main window, it adds several parts to the container for composition. This way, each UI element can have its imports satisfied when the requisite parts come available.
+MEF is used to demonstrate 3 principles in this sample. 
+
+- First, several UI elements use [import](import) to notify the system they are interested in certain components, and MEF can satisfy those imports without having to resort to hard-coding. 
+- Second, several components can have multiple variations that could be replaced at runtime. You could have multiple authentication modules to allow the viewer to log into different systems, or you could replace the types of views that are enabled.
+- Third, light-up scenarios are easily enabled. This is demonstrated by the albums package being loaded on-demand, only after the user logs in.
+
+# Important parts
+
+First, during `Application_Startup`, the app prepares the main window, sets it as the root visual, and prepares it for compostion. The initial composition adds all of the assemblies in the current xap to the container using AddPackage(Package.Current). It also adds a second PackageCatalog, wraps it in a part, which is then added to the container. This part is imported by the PhotoAlbumsProvider to add packages after the login without having to connect back to the container. After the Loaded event is fired on the main window, it adds several parts to the container for composition. This way, each UI element can have its imports satisfied when the requisite parts come available.
 
 Second, (look at how each part handles its imports)
 * Browser.xaml.cs – Imports PhotoService to connect the Albums to the TreeView (shown on the right hand side)
